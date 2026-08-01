@@ -301,7 +301,7 @@ function mercyPos() {
   return clampPos(window.innerWidth / 2 - 110, window.innerHeight * 0.7)
 }
 
-/** Más toques = un poco más rápido, sin volverse imposible. */
+/** En celu (sin mouse): intervalo de movimiento suave. */
 function roamIntervalMs(catchesCount) {
   if (catchesCount <= 2) return 1550
   if (catchesCount === 3) return 1150
@@ -310,10 +310,44 @@ function roamIntervalMs(catchesCount) {
 }
 
 function roamTransitionSec(catchesCount) {
-  if (catchesCount <= 2) return 0.85
-  if (catchesCount === 3) return 0.7
-  if (catchesCount === 4) return 0.55
-  return 0.42
+  if (catchesCount <= 2) return 0.55
+  if (catchesCount === 3) return 0.45
+  if (catchesCount === 4) return 0.38
+  return 0.32
+}
+
+/** Radio de “cerca del mouse”: crece un poco con cada toque. */
+function proximityRadius(catchesCount) {
+  if (catchesCount <= 2) return 110
+  if (catchesCount === 3) return 130
+  if (catchesCount === 4) return 150
+  return 170
+}
+
+function fleeCooldownMs(catchesCount) {
+  if (catchesCount <= 2) return 380
+  if (catchesCount === 3) return 280
+  if (catchesCount === 4) return 200
+  return 150
+}
+
+function hasFinePointer() {
+  return typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches
+}
+
+/** Huye del mouse eligiendo un punto lejos. */
+function fleeFromMouse(mx, my) {
+  let best = randomButtonPos()
+  let bestDist = -1
+  for (let i = 0; i < 10; i += 1) {
+    const p = randomButtonPos()
+    const d = Math.hypot(p.x + 110 - mx, p.y + 36 - my)
+    if (d > bestDist) {
+      best = p
+      bestDist = d
+    }
+  }
+  return best
 }
 
 export default function EmmitaWelcomeModal() {
@@ -332,6 +366,17 @@ export default function EmmitaWelcomeModal() {
   const fallingTexts = useMemo(() => makeFallingTexts(), [])
   const fallingIcons = useMemo(() => makeFallingIcons(), [])
   const buttonDecor = useMemo(() => Array.from({ length: 10 }, (_, i) => WILD_ICONS[i % WILD_ICONS.length]), [])
+  const btnPosRef = useRef(null)
+  const catchesRef = useRef(0)
+  const lastFleeRef = useRef(0)
+
+  useEffect(() => {
+    btnPosRef.current = btnPos
+  }, [btnPos])
+
+  useEffect(() => {
+    catchesRef.current = catches
+  }, [catches])
 
   useEffect(() => {
     if (!isAuthenticated || !profile?.id || profile.role !== ROLES.EMMITA) {
@@ -367,9 +412,31 @@ export default function EmmitaWelcomeModal() {
     return burstConfetti(canvasRef.current)
   }, [open])
 
-  // Solo se mueve en la fase "moving"; acelera un poco con cada toque
+  // Desktop: quieto hasta que el mouse se acerque → ahí huye.
   useEffect(() => {
-    if (!open || !roaming || mercy) return undefined
+    if (!open || !roaming || mercy || !hasFinePointer()) return undefined
+
+    function onMove(event) {
+      const pos = btnPosRef.current
+      if (!pos) return
+      const n = catchesRef.current
+      const cx = pos.x + 110
+      const cy = pos.y + 36
+      const dist = Math.hypot(event.clientX - cx, event.clientY - cy)
+      if (dist > proximityRadius(n)) return
+      const now = Date.now()
+      if (now - lastFleeRef.current < fleeCooldownMs(n)) return
+      lastFleeRef.current = now
+      setBtnPos(fleeFromMouse(event.clientX, event.clientY))
+    }
+
+    window.addEventListener('mousemove', onMove, { passive: true })
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [open, roaming, mercy])
+
+  // Celu / touch: sigue moviéndose solo (no hay hover).
+  useEffect(() => {
+    if (!open || !roaming || mercy || hasFinePointer()) return undefined
     const id = window.setInterval(() => {
       setBtnPos(randomButtonPos())
     }, roamIntervalMs(catches))
@@ -412,9 +479,13 @@ export default function EmmitaWelcomeModal() {
       return
     }
 
-    // 2) Tocó el spotlight → empieza a moverse
+    // 2) Tocó el spotlight → fase “chase”: quieto hasta que el mouse se acerque
     if (next === 2) {
-      setTaunt(START_MOVE_TAUNT)
+      setTaunt(
+        hasFinePointer()
+          ? 'Ahora está quieto… acercá el mouse y se escapa 😈'
+          : START_MOVE_TAUNT,
+      )
       setBtnPos(randomButtonPos())
       setRoaming(true)
       return
@@ -601,7 +672,7 @@ export default function EmmitaWelcomeModal() {
               : spotlight
                 ? 'Está quieto en otro lado… ¡mirá el brillo! ✨'
                 : roaming
-                  ? 'Se mueve despacito, tocálo 👇'
+                  ? 'Quieto… acercá el mouse o tocálo 👇'
                   : 'Tocá el botón 👇'}
           </p>
         )}
