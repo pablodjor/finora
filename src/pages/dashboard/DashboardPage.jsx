@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   LayoutDashboard,
   Landmark,
+  RefreshCw,
 } from 'lucide-react'
 import PageHeader from '../../components/common/PageHeader'
 import Select from '../../components/common/Select'
@@ -100,22 +101,24 @@ export default function DashboardPage() {
     loadFilters()
   }, [user?.id, toast])
 
-  useEffect(() => {
-    async function load() {
-      if (!user) return
-      setLoading(true)
-      try {
-        const result = await getDashboardData(user.id, filters)
-        setData(result)
-        setBankBalance(getBankBalance(user.id))
-      } catch (error) {
-        toast.error(error.message)
-        setData(emptyData)
-      } finally {
-        setLoading(false)
-      }
+  async function loadDashboard() {
+    if (!user) return
+    setLoading(true)
+    try {
+      const result = await getDashboardData(user.id, filters)
+      setData(result)
+      setBankBalance(getBankBalance(user.id))
+    } catch (error) {
+      toast.error(error.message)
+      setData(emptyData)
+    } finally {
+      setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadDashboard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, filters, toast, version])
 
   const comparison = useMemo(() => {
@@ -136,7 +139,13 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Resumen de tus finanzas con datos reales de tu cuenta."
         actions={
-          <Button onClick={() => openCreate({ type: 'expense' })}>Registrar movimiento</Button>
+          <>
+            <Button variant="outline" title="Recargar" loading={loading} onClick={() => loadDashboard()}>
+              <RefreshCw className="h-4 w-4" />
+              Recargar
+            </Button>
+            <Button onClick={() => openCreate({ type: 'expense' })}>Registrar movimiento</Button>
+          </>
         }
       />
 

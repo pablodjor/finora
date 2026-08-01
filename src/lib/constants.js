@@ -3,6 +3,19 @@ export const APP_NAME = 'Finora'
 export const ROLES = {
   ADMIN: 'admin',
   USER: 'user',
+  EMMITA: 'emmita',
+}
+
+export const ROLE_OPTIONS = [
+  { value: 'user', label: 'Usuario' },
+  { value: 'emmita', label: 'Emmita' },
+  { value: 'admin', label: 'Administrador' },
+]
+
+export const ROLE_LABELS = {
+  admin: 'Administrador',
+  user: 'Usuario',
+  emmita: 'Emmita',
 }
 
 export const TRANSACTION_TYPES = [

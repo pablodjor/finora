@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Camera, Copy, CheckCircle2, Pencil, Plus, Trash2, ArrowLeftRight, Upload } from 'lucide-react'
+import {
+  Camera,
+  Copy,
+  CheckCircle2,
+  Pencil,
+  Plus,
+  Trash2,
+  ArrowLeftRight,
+  Upload,
+  RefreshCw,
+} from 'lucide-react'
 import PageHeader from '../../components/common/PageHeader'
 import Button from '../../components/common/Button'
 import Badge from '../../components/common/Badge'
@@ -9,6 +19,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog'
 import Select from '../../components/common/Select'
 import Input from '../../components/common/Input'
 import FiltersPanel from '../../components/common/FiltersPanel'
+import ReceiptThumb, { ReceiptLightbox } from '../../components/common/ReceiptThumb'
 import ImportSantanderModal from '../../components/forms/ImportSantanderModal'
 import { applyMovementPaymentEffects } from '../../utils/paymentEffects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -46,6 +57,7 @@ export default function TransactionsPage({ typeFilter }) {
   const [duplicateItem, setDuplicateItem] = useState(null)
   const [busy, setBusy] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [receiptPreview, setReceiptPreview] = useState(null)
 
   function applyMonthYear(year, month) {
     const range = getMonthRange(year, month)
@@ -164,6 +176,15 @@ export default function TransactionsPage({ typeFilter }) {
         description="Registrá y organizá tus ingresos y gastos."
         actions={
           <>
+            <Button
+              variant="outline"
+              title="Recargar"
+              loading={loading}
+              onClick={() => load()}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Recargar
+            </Button>
             {!typeFilter ? (
               <Button variant="outline" onClick={() => setImportOpen(true)}>
                 <Upload className="h-4 w-4" />
@@ -259,6 +280,7 @@ export default function TransactionsPage({ typeFilter }) {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-[var(--border)] bg-[var(--bg-muted)] text-[var(--text-muted)]">
                 <tr>
+                  <th className="px-4 py-3 font-medium">Foto</th>
                   <th className="px-4 py-3 font-medium">Fecha</th>
                   <th className="px-4 py-3 font-medium">Descripción</th>
                   <th className="px-4 py-3 font-medium">Categoría</th>
@@ -270,6 +292,13 @@ export default function TransactionsPage({ typeFilter }) {
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className="border-b border-[var(--border)] last:border-0">
+                    <td className="px-4 py-3">
+                      <ReceiptThumb
+                        url={item.receipt_url}
+                        onOpen={setReceiptPreview}
+                        className="h-11 w-11"
+                      />
+                    </td>
                     <td className="px-4 py-3">{formatDate(item.date)}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium">{item.description}</p>
@@ -340,10 +369,10 @@ export default function TransactionsPage({ typeFilter }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
                     {item.receipt_url ? (
-                      <img
-                        src={item.receipt_url}
-                        alt=""
-                        className="h-12 w-12 shrink-0 rounded-md object-cover"
+                      <ReceiptThumb
+                        url={item.receipt_url}
+                        onOpen={setReceiptPreview}
+                        className="h-12 w-12"
                       />
                     ) : null}
                     <div className="min-w-0">
@@ -413,6 +442,8 @@ export default function TransactionsPage({ typeFilter }) {
         paymentMethods={paymentMethods.filter((m) => m.is_active)}
         onImported={load}
       />
+
+      <ReceiptLightbox url={receiptPreview} onClose={() => setReceiptPreview(null)} />
     </div>
   )
 }

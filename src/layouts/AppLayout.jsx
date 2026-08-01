@@ -5,6 +5,7 @@ import MobileNav from '../components/layout/MobileNav'
 import Header from '../components/layout/Header'
 import TransactionModal from '../components/forms/TransactionModal'
 import ExpenseChatPanel, { ExpenseChatFab } from '../components/chat/ExpenseChatPanel'
+import EmmitaWelcomeModal from '../components/emmita/EmmitaWelcomeModal'
 import { TransactionModalProvider } from '../contexts/TransactionModalContext'
 import { NAV_ITEMS, ADMIN_NAV_ITEMS } from '../lib/constants'
 
@@ -38,6 +39,7 @@ export default function AppLayout() {
         </div>
         <MobileNav />
         <TransactionModal />
+        <EmmitaWelcomeModal />
         {!chatOpen ? <ExpenseChatFab onClick={() => setChatOpen(true)} /> : null}
         <ExpenseChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
       </div>

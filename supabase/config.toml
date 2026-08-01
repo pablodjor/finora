@@ -1,0 +1,5 @@
+# Supabase local / CLI config (mínimo para Edge Functions)
+
+[functions.telegram-bot]
+# Telegram llama el webhook sin JWT de Supabase
+verify_jwt = false

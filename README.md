@@ -35,10 +35,24 @@ También funciona `VITE_SUPABASE_ANON_KEY` (JWT legacy).
 3. En SQL Editor, ejecutá en orden:
    - `supabase/schema.sql`
    - `supabase/seed.sql`
+   - `supabase/juntadas.sql` (opcional)
+   - `supabase/storage.sql` (opcional, fotos de recibos)
+   - `supabase/telegram.sql` (opcional, bot de Telegram)
+   - `supabase/telegram_juntadas_flow.sql` (si el bot ya estaba y faltaba `pending_flow`)
 4. Promové el primer admin:
 
 ```sql
 update public.profiles set role = 'admin' where email = 'tu@email.com';
+```
+
+### Bot de Telegram (opcional)
+
+Cargar gastos/ingresos por chat gratis. Guía completa: [`supabase/TELEGRAM_BOT.md`](supabase/TELEGRAM_BOT.md).
+
+En el frontend:
+
+```env
+VITE_TELEGRAM_BOT_USERNAME=TuBotUsername
 ```
 
 ### Desarrollo

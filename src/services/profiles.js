@@ -52,3 +52,15 @@ export async function setUserActive(userId, isActive) {
   if (error) throw new Error(getSupabaseErrorMessage(error))
   return data
 }
+
+export async function setUserRole(userId, role) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ role })
+    .eq('id', userId)
+    .select()
+    .single()
+
+  if (error) throw new Error(getSupabaseErrorMessage(error))
+  return data
+}

@@ -31,3 +31,5 @@ on conflict do nothing;
 -- Nota: los usuarios nuevos reciben copias personales vía seed_user_defaults()
 -- Promover admin manualmente:
 -- update public.profiles set role = 'admin' where email = 'tu@email.com';
+-- Rol especial emmita (bienvenida festiva):
+-- update public.profiles set role = 'emmita' where email = 'alguien@email.com';

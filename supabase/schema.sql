@@ -23,7 +23,7 @@ $$;
 
 create table if not exists public.roles (
   id uuid primary key default gen_random_uuid(),
-  code text not null unique check (code in ('admin', 'user')),
+  code text not null unique check (code in ('admin', 'user', 'emmita')),
   name text not null,
   description text,
   created_at timestamptz not null default timezone('utc', now())
@@ -32,7 +32,8 @@ create table if not exists public.roles (
 insert into public.roles (code, name, description)
 values
   ('admin', 'Administrador', 'Acceso completo a la plataforma'),
-  ('user', 'Usuario', 'Administra únicamente sus propios datos')
+  ('user', 'Usuario', 'Administra únicamente sus propios datos'),
+  ('emmita', 'Emmita', 'Usuario con bienvenida especial al ingresar')
 on conflict (code) do nothing;
 
 -- =============================================================================
@@ -43,7 +44,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text not null,
   full_name text,
-  role text not null default 'user' check (role in ('admin', 'user')),
+  role text not null default 'user' check (role in ('admin', 'user', 'emmita')),
   currency text not null default 'ARS',
   theme text not null default 'system' check (theme in ('light', 'dark', 'system')),
   locale text not null default 'es-AR',

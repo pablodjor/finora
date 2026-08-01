@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { ROLES } from '../lib/constants'
 import * as authService from '../services/auth'
 import * as profileService from '../services/profiles'
+import { clearEmmitaWelcomeFlags } from '../utils/emmitaWelcome'
 import { useTheme } from './ThemeContext'
 
 const AuthContext = createContext(null)
@@ -12,6 +13,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  /** Sube en cada SIGNED_IN para reabrir el festejo Emmita. */
+  const [loginTick, setLoginTick] = useState(0)
   const { setTheme } = useTheme()
 
   async function loadProfile(userId) {
@@ -42,7 +45,15 @@ export function AuthProvider({ children }) {
 
     init()
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      if (event === 'SIGNED_IN') {
+        clearEmmitaWelcomeFlags()
+        setLoginTick((t) => t + 1)
+      }
+      if (event === 'SIGNED_OUT') {
+        clearEmmitaWelcomeFlags()
+      }
+
       setSession(nextSession)
       setUser(nextSession?.user ?? null)
       if (nextSession?.user) {
@@ -70,12 +81,17 @@ export function AuthProvider({ children }) {
       user,
       profile,
       loading,
+      loginTick,
       isAuthenticated: Boolean(session?.user),
       isAdmin: profile?.role === ROLES.ADMIN,
+      isEmmita: profile?.role === ROLES.EMMITA,
       isActive: profile?.is_active !== false,
       signIn: authService.signIn,
       signUp: authService.signUp,
-      signOut: authService.signOut,
+      signOut: async () => {
+        clearEmmitaWelcomeFlags()
+        return authService.signOut()
+      },
       resetPassword: authService.resetPassword,
       refreshProfile: async () => {
         if (!user) return null
@@ -89,7 +105,7 @@ export function AuthProvider({ children }) {
         return updated
       },
     }),
-    [session, user, profile, loading, setTheme],
+    [session, user, profile, loading, loginTick, setTheme],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -16,7 +16,7 @@ export default function FiltersPanel({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className={cn('card mb-4 overflow-hidden', className)}>
+    <div className={cn('card relative z-10 mb-4 overflow-visible', className)}>
       <button
         type="button"
         className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left md:hidden"

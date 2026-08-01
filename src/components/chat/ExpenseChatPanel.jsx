@@ -9,6 +9,7 @@ import { listPaymentMethods } from '../../services/paymentMethods'
 import { listCreditCards } from '../../services/creditCards'
 import { createTransaction } from '../../services/transactions'
 import { hasExpenseChatAi, parseExpenseChatMessage } from '../../services/expenseChatAi'
+import { uploadReceipt } from '../../services/storage'
 import { compressImage } from '../../utils/image'
 import { formatCurrency } from '../../utils/currency'
 import { createId } from '../../utils/id'
@@ -22,6 +23,13 @@ function DraftCard({ draft, currency, onConfirm, onEdit, confirming }) {
       <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
         Borrador{draft.fromPhoto ? ' · desde foto' : ''}
       </p>
+      {draft.imagePreview ? (
+        <img
+          src={draft.imagePreview}
+          alt="Comprobante"
+          className="mt-2 h-20 w-20 rounded-lg object-cover ring-1 ring-[var(--border)]"
+        />
+      ) : null}
       {draft.whatSpent ? (
         <p className="mt-1 text-sm text-primary-700 dark:text-primary-300">
           En qué gastaste: {draft.whatSpent}
@@ -89,6 +97,7 @@ export default function ExpenseChatPanel({ open, onClose }) {
   const inputRef = useRef(null)
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
+  const pendingImageRef = useRef(null)
 
   useEffect(() => {
     if (!open || !user) return
@@ -154,8 +163,16 @@ export default function ExpenseChatPanel({ open, onClose }) {
           draft: result.draft,
         },
       ])
-      if (result.draft) setDraft(result.draft)
-      else setDraft(null)
+      if (result.draft) {
+        setDraft({
+          ...result.draft,
+          imagePreview: previewUrl || result.draft.imagePreview || null,
+          fromPhoto: Boolean(imageFile || result.draft.fromPhoto || previewUrl),
+        })
+      } else {
+        if (!imageFile) pendingImageRef.current = null
+        setDraft(null)
+      }
     } catch (error) {
       setMessages((prev) => [
         ...prev,
@@ -181,6 +198,7 @@ export default function ExpenseChatPanel({ open, onClose }) {
     try {
       const compressed = await compressImage(file)
       const previewUrl = URL.createObjectURL(compressed)
+      pendingImageRef.current = compressed
       setSending(false)
       await runParse({
         text: input,
@@ -201,6 +219,11 @@ export default function ExpenseChatPanel({ open, onClose }) {
       const isCredit = (draft.type || 'expense') === 'expense' && CREDIT_TYPES.has(method?.type)
       const creditCardId = isCredit ? creditCards[0]?.id || null : null
 
+      let receiptUrl = null
+      if (pendingImageRef.current) {
+        receiptUrl = await uploadReceipt(user.id, pendingImageRef.current)
+      }
+
       const payload = {
         user_id: user.id,
         type: draft.type || 'expense',
@@ -212,7 +235,8 @@ export default function ExpenseChatPanel({ open, onClose }) {
         credit_card_id: creditCardId,
         expense_type: draft.type === 'expense' ? 'one_time' : null,
         status: 'paid',
-        notes: draft.fromPhoto ? 'Creado desde chat IA (foto)' : 'Creado desde chat IA',
+        notes: draft.fromPhoto || receiptUrl ? 'Creado desde chat IA (foto)' : 'Creado desde chat IA',
+        receipt_url: receiptUrl,
         is_recurring: false,
         installments_count: 1,
         current_installment: 1,
@@ -237,6 +261,7 @@ export default function ExpenseChatPanel({ open, onClose }) {
             : 'Gasto guardado',
       )
       notifySaved()
+      pendingImageRef.current = null
       setDraft(null)
       setMessages((prev) => [
         ...prev,
@@ -262,6 +287,7 @@ export default function ExpenseChatPanel({ open, onClose }) {
       date: draft.date,
       category_id: draft.category_id || '',
       payment_method_id: draft.payment_method_id || '',
+      receiptFile: pendingImageRef.current || undefined,
     })
     onClose?.()
   }

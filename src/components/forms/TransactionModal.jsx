@@ -74,8 +74,19 @@ export default function TransactionModal() {
           })
         } else {
           setExistingTx(null)
-          setReceiptUrl(null)
-          const { openCamera: _openCamera, ...formPreset } = preset || {}
+          const {
+            openCamera: _openCamera,
+            receiptFile: presetReceiptFile,
+            receiptUrl: presetReceiptUrl,
+            ...formPreset
+          } = preset || {}
+          if (presetReceiptFile instanceof File) {
+            setReceiptFile(presetReceiptFile)
+            setReceiptUrl(URL.createObjectURL(presetReceiptFile))
+          } else {
+            setReceiptFile(undefined)
+            setReceiptUrl(presetReceiptUrl || null)
+          }
           setDefaults({ type: 'expense', ...formPreset })
         }
         setFormKey((k) => k + 1)
