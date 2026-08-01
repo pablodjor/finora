@@ -97,7 +97,7 @@ export default function Sidebar({ open, onClose }) {
       />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[var(--sidebar)] text-[var(--sidebar-text)] transition-transform lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-dvh w-72 flex-col bg-[var(--sidebar)] text-[var(--sidebar-text)] transition-transform lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >

@@ -28,9 +28,9 @@ export default function AppLayout() {
 
   return (
     <TransactionModalProvider>
-      <div className="flex min-h-screen bg-[var(--bg)]">
+      <div className="min-h-screen bg-[var(--bg)]">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-col lg:pl-72">
           <Header title={resolveTitle(location.pathname)} onMenuClick={() => setSidebarOpen(true)} />
           <main className="flex-1 px-4 py-5 pb-24 md:px-6 lg:pb-8">
             <Outlet />

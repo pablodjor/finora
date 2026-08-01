@@ -236,175 +236,283 @@ function safeJuntadaFilename(name) {
     .slice(0, 40)
 }
 
-function dashedLine(doc, y, x1, x2) {
-  doc.setDrawColor(150)
-  doc.setLineDashPattern([1.2, 1.2], 0)
-  doc.line(x1, y, x2, y)
-  doc.setLineDashPattern([], 0)
-}
-
-function receiptLine(doc, y, left, right, { bold = false, size = 9, muted = false } = {}) {
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 8
-  doc.setFont('helvetica', bold ? 'bold' : 'normal')
-  doc.setFontSize(size)
-  doc.setTextColor(...(muted ? BRAND.muted : BRAND.dark))
-  const maxLeft = pageW - margin * 2 - 28
-  const leftText = doc.splitTextToSize(String(left), maxLeft)
-  doc.text(leftText[0], margin, y)
-  if (right != null && right !== '') {
-    doc.text(String(right), pageW - margin, y, { align: 'right' })
+function formatShortDate(value) {
+  if (!value) return '—'
+  try {
+    const d = typeof value === 'string' ? new Date(`${value}T12:00:00`) : value
+    return d.toLocaleDateString('es-AR')
+  } catch {
+    return String(value)
   }
-  return y + Math.max(4.2, leftText.length * 3.8)
 }
 
-/** Comprobante tipo ticket (angosto) con el detalle de gastos. */
+/** Comprobante A4 de juntada con logo Finora. */
 export async function buildJuntadaPdfBlob({ summary, currency }) {
   const { juntada, expenses, balances, transfers, totalSpent } = summary
-
-  // Altura dinámica según cantidad de ítems
-  const estimatedH = Math.max(
-    180,
-    70 + expenses.length * 6 + balances.length * 14 + transfers.length * 6,
-  )
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: [80, estimatedH],
-  })
+  const members = juntada.members || []
+  const logo = await getLogoDataUrl()
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
-  const margin = 8
-  let y = 10
+  const margin = 16
+  const nowLabel = new Date().toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 
-  doc.setTextColor(...BRAND.dark)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(12)
-  doc.text('FINORA', pageW / 2, y, { align: 'center' })
-  y += 5
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...BRAND.muted)
-  doc.text('COMPROBANTE DE JUNTADA', pageW / 2, y, { align: 'center' })
-  y += 5
-  dashedLine(doc, y, margin, pageW - margin)
-  y += 6
+  // Header brand
+  doc.setFillColor(...BRAND.primary)
+  doc.rect(0, 0, pageW, 36, 'F')
+  doc.setFillColor(4, 120, 87)
+  doc.rect(0, 36, pageW, 3, 'F')
 
-  doc.setTextColor(...BRAND.dark)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  const titleLines = doc.splitTextToSize(juntada.name || 'Juntada', pageW - margin * 2)
-  doc.text(titleLines, pageW / 2, y, { align: 'center' })
-  y += titleLines.length * 5 + 2
-
-  if (juntada.notes) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(...BRAND.muted)
-    const noteLines = doc.splitTextToSize(juntada.notes, pageW - margin * 2)
-    doc.text(noteLines, pageW / 2, y, { align: 'center' })
-    y += noteLines.length * 3.5 + 2
+  if (logo) {
+    try {
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(margin, 7, 22, 22, 4, 4, 'F')
+      doc.addImage(logo, 'PNG', margin + 2.5, 9.5, 17, 17)
+    } catch {
+      // ignore logo errors
+    }
   }
 
-  doc.setFontSize(8)
-  doc.setTextColor(...BRAND.muted)
-  doc.text(new Date().toLocaleString('es-AR'), pageW / 2, y, { align: 'center' })
-  y += 4
-  dashedLine(doc, y, margin, pageW - margin)
-  y += 6
-
+  const textX = logo ? margin + 28 : margin
+  doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.text('Finora', textX, 17)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text('Comprobante de juntada', textX, 25)
   doc.setFontSize(8)
+  doc.text(nowLabel, pageW - margin, 20, { align: 'right' })
+
+  // Title card
+  let y = 48
+  doc.setFillColor(...BRAND.light)
+  doc.roundedRect(margin, y, pageW - margin * 2, juntada.notes ? 28 : 22, 3, 3, 'F')
   doc.setTextColor(...BRAND.dark)
-  doc.text('DETALLE DE GASTOS', margin, y)
-  y += 5
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  const title = doc.splitTextToSize(juntada.name || 'Juntada', pageW - margin * 2 - 10)
+  doc.text(title[0], margin + 5, y + 10)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...BRAND.muted)
+  doc.text(
+    `${members.length} personas · ${expenses.length} gastos · ${currency}`,
+    margin + 5,
+    y + 17,
+  )
+  if (juntada.notes) {
+    const notes = doc.splitTextToSize(juntada.notes, pageW - margin * 2 - 10)
+    doc.text(notes[0], margin + 5, y + 23)
+  }
+  y += juntada.notes ? 34 : 28
+
+  // KPI strip
+  const boxW = (pageW - margin * 2 - 8) / 3
+  const kpis = [
+    { label: 'Total gastado', value: formatCurrency(totalSpent, currency) },
+    { label: 'Personas', value: String(members.length) },
+    {
+      label: 'Pendiente',
+      value: transfers.length
+        ? formatCurrency(
+            transfers.reduce((acc, t) => acc + Number(t.amount || 0), 0),
+            currency,
+          )
+        : 'A mano',
+    },
+  ]
+  kpis.forEach((kpi, i) => {
+    const x = margin + i * (boxW + 4)
+    doc.setFillColor(248, 250, 252)
+    doc.setDrawColor(...BRAND.line)
+    doc.roundedRect(x, y, boxW, 18, 2.5, 2.5, 'FD')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...BRAND.muted)
+    doc.text(kpi.label, x + 4, y + 6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...BRAND.dark)
+    doc.text(kpi.value, x + 4, y + 13.5)
+  })
+  y += 26
+
+  // Settlement highlight
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(...BRAND.dark)
+  doc.text('Quién le paga a quién', margin, y)
+  y += 3
+
+  autoTable(doc, {
+    startY: y,
+    head: [['De', 'Para', 'Monto']],
+    body:
+      transfers.length > 0
+        ? transfers.map((t) => [
+            t.fromName,
+            t.toName,
+            formatCurrency(t.amount, currency),
+          ])
+        : [['—', 'Están a mano', '—']],
+    theme: 'plain',
+    headStyles: {
+      fillColor: BRAND.primary,
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: 3.5,
+    },
+    bodyStyles: {
+      fontSize: 9.5,
+      textColor: BRAND.dark,
+      cellPadding: 3.5,
+      fillColor: [255, 255, 255],
+    },
+    alternateRowStyles: { fillColor: BRAND.light },
+    styles: { lineColor: BRAND.line, lineWidth: 0.2 },
+    columnStyles: {
+      0: { cellWidth: 60 },
+      1: { cellWidth: 60 },
+      2: { halign: 'right', fontStyle: 'bold', textColor: BRAND.primary },
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  y = doc.lastAutoTable.finalY + 12
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(...BRAND.dark)
+  doc.text('Detalle de gastos', margin, y)
 
   const sorted = [...expenses].sort((a, b) =>
     String(a.expense_date || '').localeCompare(String(b.expense_date || '')),
   )
-  for (const e of sorted) {
-    y = receiptLine(doc, y, e.description || 'Gasto', formatCurrency(e.amount, currency), {
-      size: 9,
-    })
-    y = receiptLine(doc, y, `  pagó ${e.paid_by?.name || '—'}`, '', {
-      size: 7,
-      muted: true,
-    })
-    y += 1
-    if (y > doc.internal.pageSize.getHeight() - 20) {
-      doc.addPage([80, 120])
-      y = 10
-    }
-  }
 
-  y += 1
-  dashedLine(doc, y, margin, pageW - margin)
-  y += 5
-  y = receiptLine(doc, y, 'TOTAL', formatCurrency(totalSpent, currency), {
-    bold: true,
-    size: 11,
+  autoTable(doc, {
+    startY: y + 3,
+    head: [['Fecha', 'Concepto', 'Pagó', 'Importe']],
+    body: sorted.map((e) => [
+      formatShortDate(e.expense_date),
+      e.description || 'Gasto',
+      e.paid_by?.name || '—',
+      formatCurrency(e.amount, currency),
+    ]),
+    theme: 'striped',
+    headStyles: {
+      fillColor: BRAND.dark,
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: 3.2,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: BRAND.dark,
+      cellPadding: 3,
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 28 },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 36 },
+      3: { halign: 'right', cellWidth: 32, fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage(data) {
+      // keep footer space
+      if (data.pageNumber > 1 && data.cursor) {
+        /* noop */
+      }
+    },
   })
-  y += 2
-  dashedLine(doc, y, margin, pageW - margin)
-  y += 6
 
+  y = doc.lastAutoTable.finalY + 8
+
+  // Total bar
+  doc.setFillColor(...BRAND.primary)
+  doc.roundedRect(margin, y, pageW - margin * 2, 12, 2, 2, 'F')
+  doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...BRAND.dark)
-  doc.text('QUIEN LE PAGA A QUIEN', margin, y)
-  y += 5
+  doc.setFontSize(11)
+  doc.text('TOTAL', margin + 5, y + 8)
+  doc.text(formatCurrency(totalSpent, currency), pageW - margin - 5, y + 8, { align: 'right' })
+  y += 20
 
-  if (transfers.length) {
-    for (const t of transfers) {
-      y = receiptLine(
-        doc,
-        y,
-        `${t.fromName} → ${t.toName}`,
-        formatCurrency(t.amount, currency),
-        { size: 8, bold: true },
-      )
-      y += 1
-    }
-  } else {
-    y = receiptLine(doc, y, 'Estan a mano', '', { size: 8, muted: true })
+  if (y > 230) {
+    doc.addPage()
+    y = 20
   }
 
-  y += 3
-  dashedLine(doc, y, margin, pageW - margin)
-  y += 6
-
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
+  doc.setFontSize(12)
   doc.setTextColor(...BRAND.dark)
-  doc.text('RESUMEN POR PERSONA', margin, y)
-  y += 5
+  doc.text('Balance por persona', margin, y)
 
-  for (const b of balances) {
-    const netLabel =
+  autoTable(doc, {
+    startY: y + 3,
+    head: [['Persona', 'Pagó', 'Le toca', 'Resultado']],
+    body: balances.map((b) => [
+      b.name,
+      formatCurrency(b.paid, currency),
+      formatCurrency(b.owed, currency),
       b.net > 0.009
-        ? `le deben ${formatCurrency(b.net, currency)}`
+        ? `Le deben ${formatCurrency(b.net, currency)}`
         : b.net < -0.009
-          ? `debe ${formatCurrency(Math.abs(b.net), currency)}`
-          : 'a mano'
-    y = receiptLine(doc, y, b.name, netLabel, { size: 8, bold: true })
-    y = receiptLine(
-      doc,
-      y,
-      `  pago ${formatCurrency(b.paid, currency)} / le toca ${formatCurrency(b.owed, currency)}`,
-      '',
-      { size: 7, muted: true },
-    )
-    y += 1
+          ? `Debe ${formatCurrency(Math.abs(b.net), currency)}`
+          : 'A mano',
+    ]),
+    theme: 'striped',
+    headStyles: {
+      fillColor: BRAND.primary,
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: 3.2,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: BRAND.dark,
+      cellPadding: 3,
+    },
+    alternateRowStyles: { fillColor: BRAND.light },
+    columnStyles: {
+      1: { halign: 'right' },
+      2: { halign: 'right' },
+      3: { halign: 'right', fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  // Footer on all pages
+  const pageCount = doc.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i += 1) {
+    doc.setPage(i)
+    const h = doc.internal.pageSize.getHeight()
+    doc.setDrawColor(...BRAND.line)
+    doc.setLineWidth(0.3)
+    doc.line(margin, h - 16, pageW - margin, h - 16)
+    if (logo) {
+      try {
+        doc.addImage(logo, 'PNG', margin, h - 13, 8, 8)
+      } catch {
+        /* ignore */
+      }
+    }
+    doc.setTextColor(...BRAND.muted)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.text('Finora · División de gastos entre amigos', logo ? margin + 11 : margin, h - 8)
+    doc.text(`Pág. ${i}/${pageCount}`, pageW - margin, h - 8, { align: 'right' })
   }
 
-  y += 3
-  dashedLine(doc, y, margin, pageW - margin)
-  y += 6
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(...BRAND.muted)
-  doc.text('Gracias · Finora', pageW / 2, y, { align: 'center' })
-
-  const filename = `comprobante-${safeJuntadaFilename(juntada.name)}.pdf`
+  const filename = `comprobante-finora-${safeJuntadaFilename(juntada.name)}.pdf`
   return { blob: doc.output('blob'), filename }
 }
 
